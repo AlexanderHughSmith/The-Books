@@ -1,0 +1,17 @@
+# Fly.io configuration for The Books Telegram bot
+
+app = "the-books-bot"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+[env]
+  # These must be set via `flyctl secrets set` or the Fly.io dashboard
+  TELEGRAM_BOT_TOKEN = ""
+  FIREBASE_DB_URL = ""
+  GOOGLE_APPLICATION_CREDENTIALS = ""
