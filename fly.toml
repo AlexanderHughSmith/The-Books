@@ -1,17 +1,23 @@
-# Fly.io configuration for The Books Telegram bot
+# fly.toml app configuration file generated for the-books on 2026-02-07T21:15:41Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "app-blue-sun-6440"
-primary_region = "iad"
+app = 'the-books'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
 
-[[services]]
+[http_service]
   internal_port = 8080
-  protocol = "tcp"
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
-[env]
-  # These must be set via `flyctl secrets set` or the Fly.io dashboard
-  TELEGRAM_BOT_TOKEN = ""
-  FIREBASE_DB_URL = ""
-  GOOGLE_APPLICATION_CREDENTIALS = ""
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
