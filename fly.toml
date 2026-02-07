@@ -1,6 +1,6 @@
 # Fly.io configuration for The Books Telegram bot
 
-app = "the-books-bot"
+app = "app-blue-sun-6440"
 primary_region = "iad"
 
 [build]
