@@ -11,6 +11,9 @@ load_dotenv()
 
 # Load Firebase credentials from JSON string in environment variable
 firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+if not firebase_creds_json:
+    raise RuntimeError("Missing FIREBASE_CREDENTIALS_JSON environment variable.")
+
 cred = credentials.Certificate(json.loads(firebase_creds_json))
 firebase_admin.initialize_app(cred, {'databaseURL': os.getenv("FIREBASE_DB_URL")})
 
