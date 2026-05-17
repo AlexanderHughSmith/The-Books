@@ -4,11 +4,17 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
 
-cred = credentials.Certificate(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+# Load Firebase credentials from JSON string in environment variable
+firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+if not firebase_creds_json:
+    raise RuntimeError("Missing FIREBASE_CREDENTIALS_JSON environment variable.")
+
+cred = credentials.Certificate(json.loads(firebase_creds_json))
 firebase_admin.initialize_app(cred, {'databaseURL': os.getenv("FIREBASE_DB_URL")})
 
 async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
