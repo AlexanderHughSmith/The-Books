@@ -1,5 +1,7 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import ast
+import operator
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
@@ -17,21 +19,78 @@ if not firebase_creds_json:
 cred = credentials.Certificate(json.loads(firebase_creds_json))
 firebase_admin.initialize_app(cred, {'databaseURL': os.getenv("FIREBASE_DB_URL")})
 
+_BINOPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+}
+_UNARYOPS = {
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+}
+
+
+def parse_amount(text: str) -> float:
+    """Parse a plain number or a simple math expression (e.g. 10/2)."""
+    text = text.strip()
+    try:
+        return float(text)
+    except ValueError:
+        pass
+
+    try:
+        tree = ast.parse(text, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"Invalid amount: {text}") from exc
+
+    return _eval_ast(tree.body)
+
+
+def _eval_ast(node: ast.AST) -> float:
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (int, float)):
+            return float(node.value)
+        raise ValueError("Invalid number in expression")
+    if isinstance(node, ast.BinOp):
+        op = _BINOPS.get(type(node.op))
+        if op is None:
+            raise ValueError("Unsupported operator")
+        return op(_eval_ast(node.left), _eval_ast(node.right))
+    if isinstance(node, ast.UnaryOp):
+        op = _UNARYOPS.get(type(node.op))
+        if op is None:
+            raise ValueError("Unsupported operator")
+        return float(op(_eval_ast(node.operand)))
+    raise ValueError("Invalid expression")
+
+
+def ledger_key(update: Update) -> str:
+    """Firebase key: one ledger per chat, or per forum topic when in a thread."""
+    chat_id = update.effective_chat.id
+    msg = update.effective_message
+    thread_id = msg.message_thread_id if msg else None
+    if thread_id is not None:
+        return f"{chat_id}_{thread_id}"
+    return str(chat_id)
+
+
 async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Hello {update.effective_user.first_name}')
 
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Extract the numerical value from the user's message
-    chat_id = update.message.chat_id
+    key = ledger_key(update)
     try:
-        total = float(get_user_total(chat_id))
-        value = float(context.args[0])
+        total = float(get_user_total(key))
+        value = parse_amount(context.args[0])
         total += value
         total = round(total, 2)
-        set_user_total(chat_id, total)
+        set_user_total(key, total)
     except (IndexError, ValueError):
-        await update.message.reply_text("Invalid input. Please provide a numerical value.")
+        await update.message.reply_text(
+            "Invalid input. Use a number or expression (e.g. /add 10/2 food)."
+        )
         return
 
     # Reply to the user with the updated total
@@ -39,16 +98,17 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def subtract(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Extract the numerical value from the user's message
-    chat_id = update.message.chat_id
+    key = ledger_key(update)
     try:
-        total = float(get_user_total(chat_id))
-        value = float(context.args[0])
+        total = float(get_user_total(key))
+        value = parse_amount(context.args[0])
         total -= value
         total = round(total, 2)
-        set_user_total(chat_id, total)
+        set_user_total(key, total)
     except (IndexError, ValueError):
-        await update.message.reply_text("Invalid input. Please provide a numerical value.")
+        await update.message.reply_text(
+            "Invalid input. Use a number or expression (e.g. /sub 10/2 food)."
+        )
         return
 
     # Reply to the user with the updated total
@@ -56,11 +116,10 @@ async def subtract(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def paid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Extract the numerical value from the user's message
-    chat_id = update.message.chat_id
+    key = ledger_key(update)
     try:
         total = float(0)
-        set_user_total(chat_id, total)
+        set_user_total(key, total)
     except (IndexError, ValueError):
         await update.message.reply_text("Invalid input. Please provide a numerical value.")
         return
@@ -88,8 +147,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Available commands:\n"
         "/hello - Say hello\n"
-        "/add <value> - Add a numerical value to the total\n"
-        "/sub <value> - Subtract a numerical value from the total\n"
+        "/add <value> [label] - Add a number or expression (e.g. /add 10/2 food)\n"
+        "/sub <value> [label] - Subtract a number or expression\n"
         "/paid - Reset the total to zero\n"
     )
 
