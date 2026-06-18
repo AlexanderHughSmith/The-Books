@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, filters
 import ast
 import operator
 import firebase_admin
@@ -156,9 +156,9 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 app = ApplicationBuilder().token(os.getenv("TELEGRAM_BOT_TOKEN")).build()
 
 app.add_handler(CommandHandler("hello", hello))
-app.add_handler(CommandHandler("add", add))
-app.add_handler(CommandHandler("sub", subtract))
-app.add_handler(CommandHandler("paid", paid))
+app.add_handler(CommandHandler("add", add, filters=filters.UpdateType.MESSAGE))
+app.add_handler(CommandHandler("sub", subtract, filters=filters.UpdateType.MESSAGE))
+app.add_handler(CommandHandler("paid", paid, filters=filters.UpdateType.MESSAGE))
 app.add_handler(CommandHandler("help", help))
 
 app.run_polling()
